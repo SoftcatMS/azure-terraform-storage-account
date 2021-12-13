@@ -1,10 +1,20 @@
+resource "random_string" "random" {
+  length  = 4
+  special = false
+  upper   = false
+}
+
+locals {
+  hub_suffix = random_string.random.result
+}
+
 resource "azurerm_resource_group" "test_event_hub" {
   name     = "test-event-hub"
   location = "West Europe"
 }
 
 resource "azurerm_eventhub_namespace" "test_event_hub_ns" {
-  name                = "TestEventHubNamespace"
+  name                = lower(join("-", ["TestEventHubNamespace", (local.hub_suffix)]))
   location            = azurerm_resource_group.test_event_hub.location
   resource_group_name = azurerm_resource_group.test_event_hub.name
   sku                 = "Standard"
