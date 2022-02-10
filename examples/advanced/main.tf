@@ -25,7 +25,7 @@ resource "azurerm_eventhub" "eventhub" {
 
 
 module "advanced" {
-  source              = "github.com/SoftcatMS/azure-terraform-storage-account/"
+  source              = "git@github.com:SoftcatMS/azure-terraform-storage-account"
   name                = "softcatadvexample"
   random_suffix       = false
   resource_group_name = "storage-account-example-advanced"
