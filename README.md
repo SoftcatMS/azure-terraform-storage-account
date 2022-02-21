@@ -1,4 +1,4 @@
-# azure-terraform-storage-account
+# terraform-azure-storage-account
 
 Deploys a Storage Account in Azure with set of container
 
