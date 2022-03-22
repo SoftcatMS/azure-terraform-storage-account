@@ -2,8 +2,8 @@ terraform {
   required_version = ">=1.0.0"
 
   backend "azurerm" {
-    resource_group_name  = "Terraform-Storage-accountRG"
-    storage_account_name = "softcattfmodulestate"
+    resource_group_name  = "rg-terraform-modules-state"
+    storage_account_name = "softcatmodulestate"
     container_name       = "tf-modules-azure-storage-account-basic"
     key                  = "terraform.tfstate"
   }
