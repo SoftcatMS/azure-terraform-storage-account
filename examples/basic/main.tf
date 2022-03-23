@@ -1,5 +1,5 @@
 module "simple" {
-  source              = "git@github.com:SoftcatMS/terraform-azure-storage-account"
+  source              = "github.com/SoftcatMS/terraform-azure-storage-account"
   name                = "softcatbasicexample"
   random_suffix       = false
   resource_group_name = "storage-account-example-basic"
