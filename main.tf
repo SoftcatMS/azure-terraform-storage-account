@@ -53,6 +53,37 @@ resource "azurerm_storage_account" "storage" {
   enable_https_traffic_only = true
   min_tls_version           = var.min_tls_version
 
+  queue_properties {
+    dynamic "logging" {
+      for_each = var.logging
+      content {
+        delete                = logging.value.delete
+        read                  = logging.value.read
+        write                 = logging.value.write
+        version               = logging.value.version
+        retention_policy_days = logging.value.retention_policy_days
+      }
+    }
+    dynamic "hour_metrics" {
+      for_each = var.hour_metrics
+      content {
+        enabled               = hour_metrics.value.enabled
+        include_apis          = hour_metrics.value.include_apis
+        version               = hour_metrics.value.version
+        retention_policy_days = hour_metrics.value.retention_policy_days
+      }
+    }
+    dynamic "minute_metrics" {
+      for_each = var.minute_metrics
+      content {
+        enabled               = minute_metrics.value.enabled
+        include_apis          = minute_metrics.value.include_apis
+        version               = minute_metrics.value.version
+        retention_policy_days = minute_metrics.value.retention_policy_days
+      }
+    }
+  }
+
   blob_properties {
     delete_retention_policy {
       days = var.soft_delete_retention
@@ -93,6 +124,10 @@ resource "azurerm_storage_container" "storage" {
   name                  = var.containers[count.index].name
   storage_account_name  = azurerm_storage_account.storage.name
   container_access_type = var.containers[count.index].access_type
+
+  depends_on = [
+    azurerm_storage_account.storage
+  ]
 }
 
 resource "azurerm_eventgrid_event_subscription" "storage" {

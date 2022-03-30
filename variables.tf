@@ -67,7 +67,11 @@ variable "network_rules" {
     subnet_ids = list(string)
     bypass     = list(string)
   })
-  default = null
+  default = {
+    ip_rules   = []
+    subnet_ids = []
+    bypass     = ["AzureServices"]
+  }
 }
 
 variable "containers" {
@@ -109,4 +113,54 @@ variable "diagnostics" {
     metrics       = list(string)
   })
   default = null
+}
+
+variable "logging" {
+  description = "Logging config for queue properties."
+  type = list(object({
+    delete                = bool
+    read                  = bool
+    write                 = bool
+    version               = string
+    retention_policy_days = number
+  }))
+  default = [{
+    delete                = true
+    read                  = true
+    write                 = true
+    version               = "1.0"
+    retention_policy_days = 10
+  }]
+}
+
+variable "hour_metrics" {
+  description = "Hour Metrics for queue properties."
+  type = list(object({
+    enabled               = bool
+    include_apis          = bool
+    version               = string
+    retention_policy_days = number
+  }))
+  default = [{
+    enabled               = true
+    include_apis          = true
+    version               = "1.0"
+    retention_policy_days = 10
+  }]
+}
+
+variable "minute_metrics" {
+  description = "Minute Metrics for queue properties."
+  type = list(object({
+    enabled               = bool
+    include_apis          = bool
+    version               = string
+    retention_policy_days = number
+  }))
+  default = [{
+    enabled               = true
+    include_apis          = true
+    version               = "1.0"
+    retention_policy_days = 10
+  }]
 }

@@ -20,7 +20,7 @@ stages:
       steps:
       - bash: |
           echo "Checkov static code analysis"
-          docker run -t -v $(System.DefaultWorkingDirectory):/tf bridgecrew/checkov --directory /tf
+          docker run -t -v $(System.DefaultWorkingDirectory):/tf bridgecrew/checkov --directory /tf --config-file /tf/checkov.yaml 
         displayName: Checkov Static Code Analysis
         name: "Static_Code_Analysis"
         condition: always()

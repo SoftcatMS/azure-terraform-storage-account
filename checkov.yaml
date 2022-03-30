@@ -1,0 +1,14 @@
+skip-check: 
+  - CKV2_AZURE_1
+  - CKV2_AZURE_18
+  - CKV2_AZURE_21
+  - CKV_AZURE_34
+  - CKV_AZURE_43
+  - CKV2_AZURE_8
+
+  # CKV2_AZURE_1 https://docs.bridgecrew.io/docs/ensure-storage-for-critical-data-are-encrypted-with-customer-managed-key
+  # CKV2_AZURE_18 https://docs.bridgecrew.io/docs/ensure-that-storage-accounts-use-customer-managed-key-for-encryption
+  # CKV2_AZURE_21 https://docs.bridgecrew.io/docs/ensure-storage-logging-is-enabled-for-blob-service-for-read-requests
+  # CKV_AZURE_34 https://docs.bridgecrew.io/docs/set-public-access-level-to-private-for-blob-containers
+  # CKV_AZURE_43 https://docs.bridgecrew.io/docs/ensure-storage-accounts-adhere-to-the-naming-rules
+  # CKV2_AZURE_8 https://docs.bridgecrew.io/docs/ensure-the-storage-container-storing-the-activity-logs-is-not-publicly-accessible
