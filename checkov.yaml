@@ -1,9 +1,5 @@
 skip-check: 
-  - CKV2_AZURE_1
-  - CKV2_AZURE_18
   - CKV2_AZURE_21
-  - CKV_AZURE_34
-  - CKV_AZURE_43
   - CKV2_AZURE_8
 
   # CKV2_AZURE_1 https://docs.bridgecrew.io/docs/ensure-storage-for-critical-data-are-encrypted-with-customer-managed-key

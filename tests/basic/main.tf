@@ -1,46 +1,20 @@
-# module "simple" {
-#   source              = "../../"
-#   name                = "softcatbasictest"
-#   random_suffix       = false
-#   resource_group_name = "storage-account-test-basic"
-#   location            = "westeurope"
+module "simple" {
+  source = "../../"
 
-#   containers = [
-#     {
-#       name        = "softcat-container-test-basic"
-#       access_type = "private"
-#     }
-#   ]
-# }
+  name                  = "softcatbasictest"
+  create_resource_group = true
+  resource_group_name   = "storage-account-test-basic"
+  location              = "westeurope"
+  random_suffix         = false
 
-# resource "azurerm_resource_group" "example" {
-#   name     = "storage-account-test-basic"
-#   location = "westeurope"
-# }
+  containers_list = [
+    { name = "softcat-container-1-test-basic", access_type = "private" },
+    { name = "softcat-container-2-test-basic", access_type = "private" }
+  ]
 
+  tags = {
+    environment = "test"
+    engineer    = "ci/cd"
+  }
 
-# resource "azurerm_storage_account" "example" {
-#   name                     = "softcatbasictest"
-#   resource_group_name      = azurerm_resource_group.example.name
-#   location                 = azurerm_resource_group.example.location
-#   account_tier             = "Standard"
-#   account_replication_type = "LRS"
-
-#   tags = {
-#     environment = "test"
-#   }
-#   depends_on = [
-#     azurerm_resource_group.example
-#   ]
-# }
-
-
-# resource "azurerm_storage_container" "example" {
-#   name                  = "softcat-container-test-basic"
-#   storage_account_name  = azurerm_storage_account.example.name
-#   container_access_type = "private"
-
-#   depends_on = [
-#     azurerm_storage_account.example
-#   ]
-# }
+}
