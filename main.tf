@@ -4,122 +4,166 @@ resource "random_string" "unique" {
   upper   = false
 }
 
-
+#-------------------------------
+# Local Declarations
+#-------------------------------
 locals {
-  suffix = var.random_suffix ? "${random_string.unique.result}" : ""
-  default_event_rule = {
-    event_delivery_schema = null
-    labels                = null
-    filters               = null
-    eventhub_id           = null
-    service_bus_topic_id  = null
-    service_bus_queue_id  = null
-    included_event_types  = null
-  }
-
-  merged_events = [for event in var.events : merge(local.default_event_rule, event)]
-
-  diag_resource_list = var.diagnostics != null ? split("/", var.diagnostics.destination) : []
-  parsed_diag = var.diagnostics != null ? {
-    log_analytics_id   = contains(local.diag_resource_list, "Microsoft.OperationalInsights") ? var.diagnostics.destination : null
-    storage_account_id = contains(local.diag_resource_list, "Microsoft.Storage") ? var.diagnostics.destination : null
-    event_hub_auth_id  = contains(local.diag_resource_list, "Microsoft.EventHub") ? var.diagnostics.destination : null
-    metric             = var.diagnostics.metrics
-    log                = var.diagnostics.logs
-    } : {
-    log_analytics_id   = null
-    storage_account_id = null
-    event_hub_auth_id  = null
-    metric             = []
-    log                = []
-  }
+  account_tier             = (var.account_kind == "FileStorage" ? "Premium" : split("_", var.skuname)[0])
+  account_replication_type = (local.account_tier == "Premium" ? "LRS" : split("_", var.skuname)[1])
+  resource_group_name      = element(coalescelist(data.azurerm_resource_group.rgrp.*.name, azurerm_resource_group.rg.*.name, [""]), 0)
+  location                 = element(coalescelist(data.azurerm_resource_group.rgrp.*.location, azurerm_resource_group.rg.*.location, [""]), 0)
+  suffix                   = var.random_suffix ? "${random_string.unique.result}" : ""
 }
 
-resource "azurerm_resource_group" "storage" {
-  name     = var.resource_group_name
+#---------------------------------------------------------
+# Resource Group Creation or selection - Default is "false"
+#----------------------------------------------------------
+data "azurerm_resource_group" "rgrp" {
+  count = var.create_resource_group == false ? 1 : 0
+  name  = var.resource_group_name
+}
+
+resource "azurerm_resource_group" "rg" {
+  count    = var.create_resource_group ? 1 : 0
+  name     = lower(var.resource_group_name)
   location = var.location
-
-  tags = var.tags
+  tags     = merge({ "ResourceName" = format("%s", var.resource_group_name) }, var.tags, )
 }
 
-resource "azurerm_storage_account" "storage" {
+#---------------------------------------------------------
+# Storage Account Creation or selection 
+#----------------------------------------------------------
+resource "azurerm_storage_account" "storeacc" {
+  #checkov:skip=CKV_AZURE_35:Ensure default network access rule for Storage Accounts is set to deny
+  #checkov:skip=CKV_AZURE_43:Ensure Storage Accounts adhere to the naming rules
+  #checkov:skip=CKV_AZURE_59:Ensure that Storage accounts disallow public access
+  #checkov:skip=CKV2_AZURE_1:Ensure storage for critical data are encrypted with Customer Managed Key
+  #checkov:skip=CKV2_AZURE_18:Ensure that Storage Accounts use customer-managed key for encryption
   name                      = format("%s%s", lower(replace(var.name, "/[[:^alnum:]]/", "")), local.suffix)
-  resource_group_name       = azurerm_resource_group.storage.name
-  location                  = azurerm_resource_group.storage.location
-  account_kind              = "StorageV2"
-  account_tier              = var.account_tier
-  account_replication_type  = var.account_replication_type
-  access_tier               = var.access_tier
+  resource_group_name       = local.resource_group_name
+  location                  = local.location
+  account_kind              = var.account_kind
+  account_tier              = local.account_tier
+  account_replication_type  = local.account_replication_type
   enable_https_traffic_only = true
   min_tls_version           = var.min_tls_version
+  allow_blob_public_access  = var.enable_advanced_threat_protection == true ? true : false
+  tags                      = var.tags
+
+  identity {
+    type         = var.identity_ids != null ? "SystemAssigned, UserAssigned" : "SystemAssigned"
+    identity_ids = var.identity_ids
+  }
+
+  queue_properties {
+    dynamic "logging" {
+      for_each = var.logging
+      content {
+        delete                = logging.value.delete
+        read                  = logging.value.read
+        write                 = logging.value.write
+        version               = logging.value.version
+        retention_policy_days = logging.value.retention_policy_days
+      }
+    }
+    dynamic "hour_metrics" {
+      for_each = var.hour_metrics
+      content {
+        enabled               = hour_metrics.value.enabled
+        include_apis          = hour_metrics.value.include_apis
+        version               = hour_metrics.value.version
+        retention_policy_days = hour_metrics.value.retention_policy_days
+      }
+    }
+    dynamic "minute_metrics" {
+      for_each = var.minute_metrics
+      content {
+        enabled               = minute_metrics.value.enabled
+        include_apis          = minute_metrics.value.include_apis
+        version               = minute_metrics.value.version
+        retention_policy_days = minute_metrics.value.retention_policy_days
+      }
+    }
+  }
+
 
   blob_properties {
     delete_retention_policy {
-      days = var.soft_delete_retention
+      days = var.blob_soft_delete_retention_days
     }
-    dynamic "cors_rule" {
-      for_each = var.cors_rule
-      content {
-        allowed_origins    = cors_rule.value.allowed_origins
-        allowed_methods    = cors_rule.value.allowed_methods
-        allowed_headers    = cors_rule.value.allowed_headers
-        exposed_headers    = cors_rule.value.exposed_headers
-        max_age_in_seconds = cors_rule.value.max_age_in_seconds
-      }
+    container_delete_retention_policy {
+      days = var.container_soft_delete_retention_days
     }
+    versioning_enabled       = var.enable_versioning
+    last_access_time_enabled = var.last_access_time_enabled
+    change_feed_enabled      = var.change_feed_enabled
   }
 
   dynamic "network_rules" {
     for_each = var.network_rules != null ? ["true"] : []
     content {
-      default_action             = "Deny"
+      default_action             = var.network_rules.default_action
+      bypass                     = var.network_rules.bypass
       ip_rules                   = var.network_rules.ip_rules
       virtual_network_subnet_ids = var.network_rules.subnet_ids
-      bypass                     = var.network_rules.bypass
     }
   }
-
-  tags = var.tags
 }
 
-resource "azurerm_advanced_threat_protection" "threat_protection" {
-  count              = var.enable_advanced_threat_protection ? 1 : 0
-  target_resource_id = azurerm_storage_account.storage.id
+#--------------------------------------
+# Storage Advanced Threat Protection 
+#--------------------------------------
+resource "azurerm_advanced_threat_protection" "atp" {
+  target_resource_id = azurerm_storage_account.storeacc.id
   enabled            = var.enable_advanced_threat_protection
 }
 
-resource "azurerm_storage_container" "storage" {
-  count                 = length(var.containers)
-  name                  = var.containers[count.index].name
-  storage_account_name  = azurerm_storage_account.storage.name
-  container_access_type = var.containers[count.index].access_type
+#-------------------------------
+# Storage Container Creation
+#-------------------------------
+resource "azurerm_storage_container" "container" {
+  #checkov:skip=CKV_AZURE_34:Ensure that 'Public access level' is set to Private for blob containers
+  count                 = length(var.containers_list)
+  name                  = var.containers_list[count.index].name
+  storage_account_name  = azurerm_storage_account.storeacc.name
+  container_access_type = var.containers_list[count.index].access_type
 }
 
-resource "azurerm_eventgrid_event_subscription" "storage" {
-  count = length(local.merged_events)
-  name  = local.merged_events[count.index].name
-  scope = azurerm_storage_account.storage.id
-
-  event_delivery_schema         = local.merged_events[count.index].event_delivery_schema
-  labels                        = local.merged_events[count.index].labels
-  included_event_types          = local.merged_events[count.index].included_event_types
-  eventhub_endpoint_id          = local.merged_events[count.index].eventhub_id
-  service_bus_topic_endpoint_id = local.merged_events[count.index].service_bus_topic_id
-  service_bus_queue_endpoint_id = local.merged_events[count.index].service_bus_queue_id
-
-  dynamic "subject_filter" {
-    for_each = local.merged_events[count.index].filters == null ? [] : [true]
-    content {
-      subject_begins_with = lookup(local.merged_events[count.index].filters, "subject_begins_with", null) == null ? null : var.events[count.index].filters.subject_begins_with
-      subject_ends_with   = lookup(local.merged_events[count.index].filters, "subject_ends_with", null) == null ? null : var.events[count.index].filters.subject_ends_with
-    }
-  }
+#-------------------------------
+# Storage Fileshare Creation
+#-------------------------------
+resource "azurerm_storage_share" "fileshare" {
+  count                = length(var.file_shares)
+  name                 = var.file_shares[count.index].name
+  storage_account_name = azurerm_storage_account.storeacc.name
+  quota                = var.file_shares[count.index].quota
 }
 
-resource "azurerm_storage_management_policy" "storage" {
-  count = length(var.lifecycles) == 0 ? 0 : 1
+#-------------------------------
+# Storage Tables Creation
+#-------------------------------
+resource "azurerm_storage_table" "tables" {
+  #checkov:skip=CKV2_AZURE_20:Ensure Storage logging is enabled for Table service for read requests
+  count                = length(var.tables)
+  name                 = var.tables[count.index]
+  storage_account_name = azurerm_storage_account.storeacc.name
+}
 
-  storage_account_id = azurerm_storage_account.storage.id
+#-------------------------------
+# Storage Queue Creation
+#-------------------------------
+resource "azurerm_storage_queue" "queues" {
+  count                = length(var.queues)
+  name                 = var.queues[count.index]
+  storage_account_name = azurerm_storage_account.storeacc.name
+}
+
+#-------------------------------
+# Storage Lifecycle Management
+#-------------------------------
+resource "azurerm_storage_management_policy" "lcpolicy" {
+  count              = length(var.lifecycles) == 0 ? 0 : 1
+  storage_account_id = azurerm_storage_account.storeacc.id
 
   dynamic "rule" {
     for_each = var.lifecycles
@@ -133,48 +177,13 @@ resource "azurerm_storage_management_policy" "storage" {
       }
       actions {
         base_blob {
-          delete_after_days_since_modification_greater_than = rule.value.delete_after_days
+          tier_to_cool_after_days_since_modification_greater_than    = rule.value.tier_to_cool_after_days
+          tier_to_archive_after_days_since_modification_greater_than = rule.value.tier_to_archive_after_days
+          delete_after_days_since_modification_greater_than          = rule.value.delete_after_days
         }
-      }
-    }
-  }
-}
-
-data "azurerm_monitor_diagnostic_categories" "default" {
-  resource_id = "${azurerm_storage_account.storage.id}/blobServices/default"
-}
-
-resource "azurerm_monitor_diagnostic_setting" "diag" {
-  count                          = var.diagnostics != null ? 1 : 0
-  name                           = "${var.name}-sa-diag"
-  target_resource_id             = "${azurerm_storage_account.storage.id}/blobServices/default"
-  log_analytics_workspace_id     = local.parsed_diag.log_analytics_id
-  eventhub_authorization_rule_id = local.parsed_diag.event_hub_auth_id
-  eventhub_name                  = local.parsed_diag.event_hub_auth_id != null ? var.diagnostics.eventhub_name : null
-  storage_account_id             = local.parsed_diag.storage_account_id
-
-  dynamic "log" {
-    for_each = data.azurerm_monitor_diagnostic_categories.default.logs
-    content {
-      category = log.value
-      enabled  = contains(local.parsed_diag.log, "all") || contains(local.parsed_diag.log, log.value)
-
-      retention_policy {
-        enabled = false
-        days    = 0
-      }
-    }
-  }
-
-  dynamic "metric" {
-    for_each = data.azurerm_monitor_diagnostic_categories.default.metrics
-    content {
-      category = metric.value
-      enabled  = contains(local.parsed_diag.metric, "all") || contains(local.parsed_diag.metric, metric.value)
-
-      retention_policy {
-        enabled = false
-        days    = 0
+        snapshot {
+          delete_after_days_since_creation_greater_than = rule.value.snapshot_delete_after_days
+        }
       }
     }
   }

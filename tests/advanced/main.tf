@@ -1,80 +1,55 @@
-resource "random_string" "random" {
-  length  = 4
-  special = false
-  upper   = false
-}
-
-locals {
-  hub_suffix = random_string.random.result
-}
-
-resource "azurerm_resource_group" "test_event_hub" {
-  name     = "test-event-hub"
-  location = "West Europe"
-}
-
-resource "azurerm_eventhub_namespace" "test_event_hub_ns" {
-  name                = lower(join("-", ["TestEventHubNamespace", (local.hub_suffix)]))
-  location            = azurerm_resource_group.test_event_hub.location
-  resource_group_name = azurerm_resource_group.test_event_hub.name
-  sku                 = "Standard"
-  capacity            = 1
-
-  tags = {
-    environment = "Production"
-  }
-}
-
-resource "azurerm_eventhub" "eventhub" {
-  name                = "TestEventHub"
-  namespace_name      = azurerm_eventhub_namespace.test_event_hub_ns.name
-  resource_group_name = azurerm_resource_group.test_event_hub.name
-  partition_count     = 2
-  message_retention   = 1
-}
-
-
 module "advanced" {
-  source              = "../../"
-  name                = "softcatadvtest"
-  random_suffix       = false
-  resource_group_name = "storage-account-test-advanced"
-  location            = "westeurope"
+  source = "../../"
 
-  containers = [
-    {
-      name        = "softcat-container-test-advanced"
-      access_type = "private"
-    },
+  name                  = "softcatadvancedtest"
+  create_resource_group = true
+  resource_group_name   = "storage-account-test-advanced"
+  location              = "westeurope"
+  random_suffix         = false
+
+  containers_list = [
+    { name = "softcat-container-1-test-advanced", access_type = "private" },
+    { name = "softcat-container-2-test-advanced", access_type = "blob" },
+    { name = "softcat-container-3-test-advanced", access_type = "container" }
+
   ]
+
+  enable_advanced_threat_protection = true
+
+
+  # SMB file share with quota (GB) to create
+  file_shares = [
+    { name = "smbfileshare1", quota = 50 },
+    { name = "smbfileshare2", quota = 50 }
+  ]
+
+  # Storage tables
+  tables = ["table1", "table2", "table3"]
+
+  # Storage queues
+  queues = ["queue1", "queue2"]
+
+  # Lifecycle management for storage account.
+  # Must specify the value to each argument and default is `0` 
   lifecycles = [
     {
-      prefix_match      = ["softcat-container-test-advanced/path1"]
-      delete_after_days = 2
+      prefix_match               = ["mystore250/folder_path"]
+      tier_to_cool_after_days    = 0
+      tier_to_archive_after_days = 50
+      delete_after_days          = 100
+      snapshot_delete_after_days = 30
     },
     {
-      prefix_match      = ["softcat-container-test-advanced/path2"]
-      delete_after_days = 5
+      prefix_match               = ["blobstore251/another_path"]
+      tier_to_cool_after_days    = 0
+      tier_to_archive_after_days = 30
+      delete_after_days          = 75
+      snapshot_delete_after_days = 30
     }
   ]
-  cors_rule = [
-    {
-      allowed_origins    = ["https://myhost.com"]
-      allowed_methods    = ["GET", "OPTIONS"]
-      allowed_headers    = ["*"]
-      exposed_headers    = ["*"]
-      max_age_in_seconds = 200
-    },
-  ]
-  events = [
-    {
-      name                 = "send-to-eventhub"
-      eventhub_id          = azurerm_eventhub.eventhub.id
-      service_bus_topic_id = null
-      included_event_types = ["Microsoft.Storage.BlobCreated", "Microsoft.Storage.BlobDeleted"]
-      filters = {
-        subject_begins_with = "test"
-      }
-    }
-  ]
+
+  tags = {
+    environment = "test"
+    engineer    = "ci/cd"
+  }
 }
