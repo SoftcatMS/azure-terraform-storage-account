@@ -3,13 +3,17 @@ on:
   push:
     branches:
       - main
+
+permissions: read-all
+
 jobs:
   release:
     name: release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  
     outputs:
       EXISTING_TAG: ${{ steps.check_tag.outputs.EXISTING_TAG }}
-    
+    permissions: write-all
+
     steps:
     - uses: actions/checkout@v2
       with:
