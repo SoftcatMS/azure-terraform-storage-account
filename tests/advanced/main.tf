@@ -16,6 +16,13 @@ module "advanced" {
 
   enable_advanced_threat_protection = true
 
+  network_rules = {
+    default_action = "Allow"
+    bypass         = ["AzureServices"]
+    subnet_ids     = []
+    ip_rules       = []
+  }
+
 
   # SMB file share with quota (GB) to create
   file_shares = [
