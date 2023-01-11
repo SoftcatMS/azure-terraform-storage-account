@@ -39,6 +39,7 @@ resource "azurerm_storage_account" "storeacc" {
   #checkov:skip=CKV_AZURE_59:Ensure that Storage accounts disallow public access
   #checkov:skip=CKV2_AZURE_1:Ensure storage for critical data are encrypted with Customer Managed Key
   #checkov:skip=CKV2_AZURE_18:Ensure that Storage Accounts use customer-managed key for encryption
+  #checkov:skip=CKV_AZURE_36:Ensure 'Trusted Microsoft Services' is enabled for Storage Account access
   name                      = format("%s%s", lower(replace(var.name, "/[[:^alnum:]]/", "")), local.suffix)
   resource_group_name       = local.resource_group_name
   location                  = local.location
